@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WASD Cursor</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --fg: #e6e9f2;
+      --accent: #6ea8fe;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      background: radial-gradient(1200px 800px at 70% -10%, #172035 0%, var(--bg) 40%, #050813 100%);
+      color: var(--fg);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      overflow: hidden; /* prevent page from scrolling when holding keys */
+    }
+    header {
+      position: fixed; inset: 20px auto auto 20px;
+      padding: 10px 12px; border-radius: 12px; backdrop-filter: blur(6px);
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+      user-select: none; pointer-events: none; font-size: 14px; line-height: 1.35;
+    }
+    code { background: rgba(255,255,255,0.08); padding: 2px 6px; border-radius: 6px; }
+
+    /* The custom cursor */
+    .cursor {
+      position: fixed;
+      left: 0; top: 0;
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 16px rgba(110,168,254,0.8), inset 0 0 6px rgba(255,255,255,0.6);
+      transform: translate(-100px, -100px);
+      will-change: transform;
+    }
+
+    /* Optional target to aim at */
+    .target {
+      position: fixed; width: 28px; height: 28px; border-radius: 50%;
+      border: 2px dashed rgba(255,255,255,0.35);
+      transform: translate(-1000px,-1000px);
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div><strong>Move the dot with <code>W A S D</code></strong></div>
+    <div>Hold multiple keys for diagonals. Press <code>R</code> to recenter.</div>
+    <div>Click anywhere to place a <em>target</em>.</div>
+  </header>
+
+  <div id="cursor" class="cursor" aria-label="cursor"></div>
+  <div id="target" class="target" aria-hidden="true"></div>
+
+  <script>
+    // --- State ---
+    const cursorEl = document.getElementById('cursor');
+    const targetEl = document.getElementById('target');
+
+    let x = innerWidth / 2;
+    let y = innerHeight / 2;
+
+    const keys = Object.create(null);
+    const SPEED = 420;         // pixels per second
+    const RADIUS = 8;          // cursor visual radius (half of 16px)
+
+    // --- Helpers ---
+    function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+    function placeCursor(nx, ny) {
+      x = clamp(nx, RADIUS, innerWidth - RADIUS);
+      y = clamp(ny, RADIUS, innerHeight - RADIUS);
+      cursorEl.style.transform = `translate(${x - RADIUS}px, ${y - RADIUS}px)`;
+    }
+
+    // Initial position
+    placeCursor(x, y);
+
+    // --- Input handling ---
+    const handled = new Set(['w','a','s','d','r']);
+
+    addEventListener('keydown', (e) => {
+      const k = e.key.toLowerCase();
+      if (handled.has(k)) {
+        keys[k] = true;
+        e.preventDefault();
+      }
+    }, { passive: false });
+
+    addEventListener('keyup', (e) => {
+      const k = e.key.toLowerCase();
+      if (handled.has(k)) {
+        keys[k] = false;
+        e.preventDefault();
+      }
+    }, { passive: false });
+
+    // Recenter with R
+    addEventListener('keyup', (e) => {
+      if (e.key.toLowerCase() === 'r') {
+        placeCursor(innerWidth / 2, innerHeight / 2);
+      }
+    });
+
+    // Resize safety
+    addEventListener('resize', () => placeCursor(x, y));
+
+    // Click to place target
+    addEventListener('click', (e) => {
+      targetEl.style.transform = `translate(${e.clientX - 14}px, ${e.clientY - 14}px)`;
+    });
+
+    // --- Main loop ---
+    let last = undefined;
+    function tick(t) {
+      if (last === undefined) last = t;
+      const dt = (t - last) / 1000; // seconds
+      last = t;
+
+      let dx = 0, dy = 0;
+      if (keys['a']) dx -= 1;
+      if (keys['d']) dx += 1;
+      if (keys['w']) dy -= 1;
+      if (keys['s']) dy += 1;
+
+      if (dx !== 0 || dy !== 0) {
+        const len = Math.hypot(dx, dy) || 1;
+        dx /= len; dy /= len; // normalize so diagonals aren't faster
+        placeCursor(x + dx * SPEED * dt, y + dy * SPEED * dt);
+      }
+
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  </script>
+</body>
+</html>
